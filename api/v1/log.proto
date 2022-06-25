@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+// Messages should be grouped by a major version.
+// This major version gives more control when infrastructure
+// is being re-architected or when multiple message versions
+// are running at the same time during a migration.
+// If breaking compatability is needed then create a new major
+// version. Do not modify existing version source code.
+package log.v1;
+
+// A package name is specified because this protobuf package name
+// is used as the package name in the generated Go code and it 
+// prevents name clashes between protocol message types that
+// have the same name.
+option go_package = "github.com/jimxshaw/loglib/api/log_v1";
+
+// Protobuf Record matches the Go Record struct.
+message Record {
+  bytes value = 1;
+  uint64 offset = 2;
+}
