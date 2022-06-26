@@ -8,10 +8,14 @@ import (
 )
 
 var (
+	// Sizes and index entries of records are
+	// persisted using this type of encoding.
 	enc = binary.BigEndian
 )
 
 const (
+	// Number of bytes used to store
+	// the record's length.
 	lenWidth = 8
 )
 
