@@ -20,7 +20,10 @@ const (
 )
 
 type store struct {
+	// Type embedding:
+	// https://go101.org/article/type-embedding.html
 	*os.File
+
 	mu   sync.Mutex
 	buf  *bufio.Writer
 	size uint64
