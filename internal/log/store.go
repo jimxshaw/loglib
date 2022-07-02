@@ -107,3 +107,17 @@ func (s *store) Read(position uint64) ([]byte, error) {
 	// Returns the record stored at the given position.
 	return b, nil
 }
+
+// This reads the length of the byte slice into the byte slice
+// starting at the offset in the store's file. It implements
+// io.ReadAt interface on the store struct.
+func (s *store) ReadAt(p []byte, offset int64) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.buf.Flush(); err != nil {
+		return 0, err
+	}
+
+	return s.File.ReadAt(p, offset)
+}
