@@ -108,7 +108,7 @@ func (s *store) Read(position uint64) ([]byte, error) {
 	return b, nil
 }
 
-// This reads the length of the byte slice into the byte slice
+// ReadAt reads the length of the byte slice into the byte slice
 // starting at the offset in the store's file. It implements
 // io.ReadAt interface on the store struct.
 func (s *store) ReadAt(p []byte, offset int64) (int, error) {
@@ -120,4 +120,16 @@ func (s *store) ReadAt(p []byte, offset int64) (int, error) {
 	}
 
 	return s.File.ReadAt(p, offset)
+}
+
+// Close persists any buffered data before closing the file.
+func (s *store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.buf.Flush(); err != nil {
+		return err
+	}
+
+	return s.File.Close()
 }
