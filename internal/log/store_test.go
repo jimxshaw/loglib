@@ -56,3 +56,23 @@ func testRead(t *testing.T, s *store) {
 		position += width
 	}
 }
+
+func testReadAt(t *testing.T, s *store) {
+	t.Helper()
+
+	for i, offset := uint64(1), int64(0); i < 4; i++ {
+		b := make([]byte, lenWidth)
+		numOfBytesRead, err := s.ReadAt(b, offset)
+		require.NoError(t, err)
+		require.Equal(t, lenWidth, numOfBytesRead)
+		offset += int64(numOfBytesRead)
+
+		size := enc.Uint64(b)
+		b = make([]byte, size)
+		numOfBytesRead, err = s.ReadAt(b, offset)
+		require.NoError(t, err)
+		require.Equal(t, write, b)
+		require.Equal(t, int(size), numOfBytesRead)
+		offset += int64(numOfBytesRead)
+	}
+}
