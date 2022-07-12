@@ -26,6 +26,22 @@ type index struct {
 	size uint64
 }
 
+/*
+	When this service starts, it needs to know the offset to be set
+	on the next record appended to the log. Knowing that offet is as
+	simple as reading the last 12 bytes of the file. This process can
+	be messy as we grow the files so we memory-map them. The re-sizing
+	has to be now because once they're memory-mapped they can no longer
+	be re-sized. Files are grown by appending empty space at the end of
+	them. As a result, the last entry will no longer be at the end
+	of the file due to the unknown amount of space between the last entry
+	and the end of the file. This unknown space will prevent the service
+	from restarting properly. This is why the service is shut down by
+	truncating the index files to remove the empty space and to put the last
+	entry at the end of the file again. This shutdown returns the service to
+	a state where it can restart properly and efficiently.
+*/
+
 // newIndex creates an index for the given file.
 // Create the index and save the current file size in
 // order to keep track of the amount of data in the index
@@ -62,7 +78,7 @@ func newIndex(f *os.File, c Config) (*index, error) {
 }
 
 // Close ensures the memory-mapped file has synced its data to
-// the persisted file and has flushed its contents to stable 
+// the persisted file and has flushed its contents to stable
 // storage. Then truncates the persisted file to the amount
 // of data that's actually in it and closes the file.
 func (i *index) Close() error {
