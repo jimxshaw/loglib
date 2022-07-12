@@ -19,6 +19,9 @@ var (
 
 type index struct {
 	file *os.File
+	// https://en.wikipedia.org/wiki/Memory-mapped_file
 	mmap gommap.MMap
+	// Size of the index and where to write the
+	// next entry appended to the index.
 	size uint64
 }
