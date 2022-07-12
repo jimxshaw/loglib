@@ -1,6 +1,7 @@
 package log
 
 import (
+	"io"
 	"os"
 
 	"github.com/tysonmote/gommap"
@@ -75,6 +76,34 @@ func newIndex(f *os.File, c Config) (*index, error) {
 	}
 
 	return index, nil
+}
+
+// Read takes in an offset and returns the associated record's position in
+// the store. The given offset is relative to the segment's base offset:
+// 0 is the index's first entry's offset, 1 is the second entry and so on.
+// Relative offsets of uint32 are used to reduce the index size. If absolute
+// offsets are used then they'd have to be stored as uint64 and then will need
+// four more bytes for each entry. That adds up for billions to trillions
+// of records.
+func (i *index) Read(in int64) (out uint32, position uint64, err error) {
+	if i.size == 0 {
+		return 0, 0, io.EOF
+	}
+	if in == -1 {
+		out = uint32((i.size / entryWidth) - 1)
+	} else {
+		out = uint32(in)
+	}
+
+	position = uint64(out) * entryWidth
+	if i.size < position+entryWidth {
+		return 0, 0, io.EOF
+	}
+
+	out = enc.Uint32(i.mmap[position : position+offsetWidth])
+	position = enc.Uint64(i.mmap[position+offsetWidth : position+entryWidth])
+
+	return out, position, nil
 }
 
 // Close ensures the memory-mapped file has synced its data to
