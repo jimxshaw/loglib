@@ -26,7 +26,7 @@ func TestIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _, err = index.Read(-1)
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.Equal(t, f.Name(), index.Name())
 
 	entries := []struct {
