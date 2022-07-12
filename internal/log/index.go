@@ -25,3 +25,38 @@ type index struct {
 	// next entry appended to the index.
 	size uint64
 }
+
+// newIndex creates an index for the given file.
+// Create the index and save the current file size in
+// order to keep track of the amount of data in the index
+// file as more index entries are added. Grow the file to
+// the max index size before memory-mapping the file and
+// return the created index to the caller.
+func newIndex(f *os.File, c Config) (*index, error) {
+	index := &index{
+		file: f,
+	}
+
+	file, err := os.Stat(f.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	index.size = uint64(file.Size())
+	if err = os.Truncate(
+		f.Name(),
+		int64(c.Segment.MaxIndexBytes),
+	); err != nil {
+		return nil, err
+	}
+
+	if index.mmap, err = gommap.Map(
+		index.file.Fd(),
+		gommap.PROT_READ|gommap.PROT_WRITE,
+		gommap.MAP_SHARED,
+	); err != nil {
+		return nil, err
+	}
+
+	return index, nil
+}
