@@ -106,6 +106,23 @@ func (i *index) Read(in int64) (out uint32, position uint64, err error) {
 	return out, position, nil
 }
 
+// Write appends the given offset and position to the index.
+// Validate that space is available to write the entry. Next,
+// encode the offset and position and then write them to the
+// memory-mapped file. Finally, increment the position where
+// the next write will go.
+func (i *index) Write(offset uint32, position uint64) error {
+	if uint64(len(i.mmap)) < i.size+entryWidth {
+		return io.EOF
+	}
+
+	enc.PutUint32(i.mmap[i.size:i.size+offsetWidth], offset)
+	enc.PutUint64(i.mmap[i.size+offsetWidth:i.size+entryWidth], position)
+	i.size += uint64(entryWidth)
+
+	return nil
+}
+
 // Close ensures the memory-mapped file has synced its data to
 // the persisted file and has flushed its contents to stable
 // storage. Then truncates the persisted file to the amount
