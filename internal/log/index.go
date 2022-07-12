@@ -60,3 +60,21 @@ func newIndex(f *os.File, c Config) (*index, error) {
 
 	return index, nil
 }
+
+// Close ensures the memory-mapped file has synced its data to
+// the persisted file and has flushed its contents to stable 
+// storage. Then truncates the persisted file to the amount
+// of data that's actually in it and closes the file.
+func (i *index) Close() error {
+	if err := i.mmap.Sync(gommap.MS_ASYNC); err != nil {
+		return err
+	}
+	if err := i.file.Sync(); err != nil {
+		return err
+	}
+	if err := i.file.Truncate(int64(i.size)); err != nil {
+		return err
+	}
+
+	return i.file.Close()
+}
