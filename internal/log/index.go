@@ -140,3 +140,7 @@ func (i *index) Close() error {
 
 	return i.file.Close()
 }
+
+func (i *index) Name() string {
+	return i.file.Name()
+}
