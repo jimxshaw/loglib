@@ -10,9 +10,9 @@ package log
 type segment struct {
 	store *store
 	index *index
-	// These two are needed to know what offset to append
+	// These offsets are needed to know what offset to append
 	// new records under and to calculate the relative offsets
-	// for the index entires.
+	// for the index entries.
 	baseOffset uint64
 	nextOffset uint64
 	// Config is in the segment in order to compare the store
