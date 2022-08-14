@@ -115,3 +115,25 @@ func (s *segment) Append(record *api.Record) (offset uint64, err error) {
 
 	return current, nil
 }
+
+// Read returns the record for the given offset.
+func (s *segment) Read(offset uint64) (*api.Record, error) {
+	// Translate the absolute index into a relative offset and get
+	// the associated index entry.
+	_, position, err := s.index.Read(int64(offset - s.baseOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	// The segment goes to the record's position in the store
+	// and read the proper amount of data.
+	p, err := s.store.Read(position)
+	if err != nil {
+		return nil, err
+	}
+
+	record := &api.Record{}
+	err = proto.Unmarshal(p, record)
+
+	return record, err
+}
