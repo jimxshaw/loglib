@@ -145,3 +145,18 @@ func (s *segment) IsMaxed() bool {
 	return s.store.size >= s.config.Segment.MaxStoreBytes ||
 		s.index.size >= s.config.Segment.MaxIndexBytes
 }
+
+// This closes the segment and removes the index and store files.
+func (s *segment) Remove() error {
+	if err := s.Close(); err != nil {
+		return err
+	}
+	if err := os.Remove(s.index.Name()); err != nil {
+		return err
+	}
+	if err := os.Remove(s.store.Name()); err != nil {
+		return err
+	}
+
+	return nil
+}
