@@ -1,5 +1,11 @@
 package log
 
+import (
+	"fmt"
+	"os"
+	"path"
+)
+
 // Segment wraps the store and index types and
 // coordinates operations across them.
 // For example, when the log appends a record to
@@ -19,4 +25,59 @@ type segment struct {
 	// file and the index sizes to the configured limits, which
 	// lets us know when the segment is maxed out.
 	config Config
+}
+
+// The log calls this when it needs to add a new segment, such as when the
+// current active segment hits its max size.
+func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
+	s := &segment{
+		baseOffset: baseOffset,
+		config:     c,
+	}
+
+	var err error
+	// Create the file if it doesn't exist yet.
+	// The append flag makes the operating system append to the
+	// file when writing.
+	storeFile, err := os.OpenFile(
+		path.Join(dir, fmt.Sprintf("%d%s", baseOffset, ".store")),
+		os.O_RDWR|os.O_CREATE|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if s.store, err = newStore(storeFile); err != nil {
+		return nil, err
+	}
+
+	// Create the file if it doesn't exist yet.
+	indexFile, err := os.OpenFile(
+		path.Join(dir, fmt.Sprintf("%d%s", baseOffset, ".index")),
+		os.O_RDWR|os.O_CREATE,
+		0644,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if s.index, err = newIndex(indexFile, c); err != nil {
+		return nil, err
+	}
+
+	// Set the segment's next offset to prepare for the
+	// next appended record.
+	if off, _, err := s.index.Read(-1); err != nil {
+		// If the index is empty then the next record appended to
+		// the segment would be the first record and its offset
+		// would be the segment's base offset.
+		s.nextOffset = baseOffset
+	} else {
+		// If the index has at least one entry then that means
+		// the offset of the next record written should take
+		// the offset at the end of the segment by adding 1
+		// to the base offset and relative offset.
+		s.nextOffset = baseOffset + uint64(off) + 1
+	}
+
+	return s, nil
 }
