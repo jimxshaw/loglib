@@ -171,3 +171,14 @@ func (s *segment) Close() error {
 
 	return nil
 }
+
+// We take the lesser multiple to make sure we
+// stay under the user's disk capacity.
+// E.g. nearestMultiple(9, 4) == 8
+func nearestMultiple(j, k uint64) uint64 {
+	if j >= 0 {
+		return (j / k) * k
+	}
+
+	return ((j - k + 1) / k) * k
+}
