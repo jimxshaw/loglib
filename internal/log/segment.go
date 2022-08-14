@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // Segment wraps the store and index types and
@@ -80,4 +82,36 @@ func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
 	}
 
 	return s, nil
+}
+
+// Append writes the record to the segment and returns the newly appended record's offset.
+// The log returns the offset to the API response.
+func (s *segment) Append(record *api.Record) (offset uint64, err error) {
+	current := s.nextOffset
+	record.Offset = current
+
+	p, err := proto.Marshal(record)
+	if err != nil {
+		return 0, err
+	}
+
+	// The segment appends the data to the store and then adds an index entry.
+	_, position, err := s.store.Append(p)
+	if err != nil {
+		return 0, err
+	}
+	if err = s.index.Write(
+		// index offsets are relative to the base offset.
+		// Subtract the segment's next offset from its base offset, which are
+		// both absolute offsets, to get the entry's relative offset in the segment.
+		uint32(s.nextOffset-uint64(s.baseOffset)),
+		position,
+	); err != nil {
+		return 0, nil
+	}
+
+	// Increment the next offset to prep for a future append call.
+	s.nextOffset++
+
+	return current, nil
 }
