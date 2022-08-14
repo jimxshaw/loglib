@@ -137,3 +137,11 @@ func (s *segment) Read(offset uint64) (*api.Record, error) {
 
 	return record, err
 }
+
+// The log uses this to know it needs to create a new segment.
+func (s *segment) IsMaxed() bool {
+	// Writing a small number of long logs will hit the segment bytes limit.
+	// Writing many short logs will hit the index bytes limit.
+	return s.store.size >= s.config.Segment.MaxStoreBytes ||
+		s.index.size >= s.config.Segment.MaxIndexBytes
+}
