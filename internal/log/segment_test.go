@@ -7,5 +7,5 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	api "github.com/jimxshaw/loglib/api/log_v1"
+	api "github.com/jimxshaw/loglib/api/v1"
 )
