@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -24,6 +25,11 @@ type Log struct {
 
 	activeSegment *segment
 	segments      []*segment
+}
+
+type originReader struct {
+	*store
+	offset int64
 }
 
 // Set config defaults if the caller didn't specify,
@@ -197,4 +203,26 @@ func (l *Log) Truncate(lowest uint64) error {
 	}
 	l.segments = segments
 	return nil
+}
+
+// Returns a reader to read the whole log.
+// This is used to concatenate the segments' stores.
+// The originReader type is needed to ensure we begin
+// reading from the origin of the store and read the
+// entire file.
+func (l *Log) Reader() io.Reader {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	readers := make([]io.Reader, len(l.segments))
+	for i, segment := range l.segments {
+		readers[i] = &originReader{segment.store, 0}
+	}
+	return io.MultiReader(readers...)
+}
+
+func (o *originReader) Read(p []byte) (int, error) {
+	n, err := o.ReadAt(p, o.offset)
+	o.offset += int64(n)
+	return n, err
 }
