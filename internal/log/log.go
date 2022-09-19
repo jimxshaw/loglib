@@ -38,6 +38,9 @@ func NewLog(dir string, c Config) (*Log, error) {
 	return l, l.setup()
 }
 
+// When a log starts, set itself up for for segments already
+// exist on disk or if the leg is new and has no segments
+// then bootstraping the initial segment.
 func (l *Log) setup() error {
 	files, err := ioutil.ReadDir(l.Dir)
 	if err != nil {
