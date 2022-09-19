@@ -2,7 +2,9 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -23,6 +25,11 @@ type Log struct {
 
 	activeSegment *segment
 	segments      []*segment
+}
+
+type originReader struct {
+	*store
+	offset int64
 }
 
 // Set config defaults if the caller didn't specify,
@@ -127,4 +134,108 @@ func (l *Log) Read(offset uint64) (*api.Record, error) {
 	// entry from the segment's index and we read the data out of the
 	// segment's store file and return the data.
 	return s.Read(offset)
+}
+
+// Iterate over the segments and closes them.
+func (l *Log) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for _, segment := range l.segments {
+		if err := segment.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Closes the log and remove its data.
+func (l *Log) Remove() error {
+	if err := l.Close(); err != nil {
+		return err
+	}
+	return os.RemoveAll(l.Dir)
+}
+
+// Removes the log and creates a new log to replace it.
+func (l *Log) Reset() error {
+	if err := l.Remove(); err != nil {
+		return err
+	}
+	return l.setup()
+}
+
+func (l *Log) LowestOffset() (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.segments[0].baseOffset, nil
+}
+
+func (l *Log) HighestOffset() (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	offset := l.segments[len(l.segments)-1].nextOffset
+	if offset == 0 {
+		return 0, nil
+	}
+	return offset - 1, nil
+}
+
+// Removes all segments whose highest offset is lower than
+// lowest. We don't have infinite disk space so we call
+// truncate periodically to remove old segments whose data
+// has hopefully been procssed by then and don't need anymore.
+func (l *Log) Truncate(lowest uint64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var segments []*segment
+	for _, s := range l.segments {
+		if s.nextOffset <= lowest+1 {
+			if err := s.Remove(); err != nil {
+				return err
+			}
+			continue
+		}
+		segments = append(segments, s)
+	}
+	l.segments = segments
+	return nil
+}
+
+// Returns a reader to read the whole log.
+// This is used to concatenate the segments' stores.
+// The originReader type is needed to ensure we begin
+// reading from the origin of the store and read the
+// entire file.
+func (l *Log) Reader() io.Reader {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	readers := make([]io.Reader, len(l.segments))
+	for i, segment := range l.segments {
+		readers[i] = &originReader{segment.store, 0}
+	}
+	return io.MultiReader(readers...)
+}
+
+func (o *originReader) Read(p []byte) (int, error) {
+	n, err := o.ReadAt(p, o.offset)
+	o.offset += int64(n)
+	return n, err
+}
+
+// Creates a new segment, appends that segment to the
+// log's slice of segments and make the new segment the
+// active segment so that subsequent append calls write to it.
+func (l *Log) newSegment(offset uint64) error {
+	s, err := newSegment(l.Dir, offset, l.Config)
+	if err != nil {
+		return err
+	}
+	l.segments = append(l.segments, s)
+	l.activeSegment = s
+	return nil
 }
