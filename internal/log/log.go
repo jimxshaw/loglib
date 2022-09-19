@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
@@ -99,4 +100,31 @@ func (l *Log) Append(record *api.Record) (uint64, error) {
 	}
 
 	return offset, err
+}
+
+// Reads the record stored at the given offset.
+func (l *Log) Read(offset uint64) (*api.Record, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	var s *segment
+	for _, segment := range l.segments {
+		// Since the segments are in order from oldest to newest and the
+		// segment's base offset is the smallest offset in the segment,
+		// we iterate over the segments until we find the first segment
+		// whose base offset is less than or equal to the offset we seek.
+		if segment.baseOffset <= offset && offset < segment.nextOffset {
+			s = segment
+			break
+		}
+	}
+
+	if s == nil || s.nextOffset <= offset {
+		return nil, fmt.Errorf("offset out of range: %d", offset)
+	}
+
+	// Once we know the segment that contains the record, we get the index
+	// entry from the segment's index and we read the data out of the
+	// segment's store file and return the data.
+	return s.Read(offset)
 }
