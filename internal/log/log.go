@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -127,4 +128,34 @@ func (l *Log) Read(offset uint64) (*api.Record, error) {
 	// entry from the segment's index and we read the data out of the
 	// segment's store file and return the data.
 	return s.Read(offset)
+}
+
+// Iterate over the segments and closes them.
+func (l *Log) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for _, segment := range l.segments {
+		if err := segment.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Closes the log and remove its data.
+func (l *Log) Remove() error {
+	if err := l.Close(); err != nil {
+		return err
+	}
+	return os.RemoveAll(l.Dir)
+}
+
+// Removes the log and creates a new log to replace it.
+func (l *Log) Reset() error {
+	if err := l.Remove(); err != nil {
+		return err
+	}
+	return l.setup()
 }
