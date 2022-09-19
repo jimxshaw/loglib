@@ -159,3 +159,20 @@ func (l *Log) Reset() error {
 	}
 	return l.setup()
 }
+
+func (l *Log) LowestOffset() (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.segments[0].baseOffset, nil
+}
+
+func (l *Log) HighestOffset() (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	offset := l.segments[len(l.segments)-1].nextOffset
+	if offset == 0 {
+		return 0, nil
+	}
+	return offset - 1, nil
+}
