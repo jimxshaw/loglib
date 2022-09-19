@@ -226,3 +226,16 @@ func (o *originReader) Read(p []byte) (int, error) {
 	o.offset += int64(n)
 	return n, err
 }
+
+// Creates a new segment, appends that segment to the
+// log's slice of segments and make the new segment the
+// active segment so that subsequent append calls write to it.
+func (l *Log) newSegment(offset uint64) error {
+	s, err := newSegment(l.Dir, offset, l.Config)
+	if err != nil {
+		return err
+	}
+	l.segments = append(l.segments, s)
+	l.activeSegment = s
+	return nil
+}
