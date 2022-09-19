@@ -1,12 +1,15 @@
 package log
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	api "github.com/jimxshaw/loglib/api/v1"
 )
 
 // The log consists of a list of segments and
@@ -38,12 +41,17 @@ func NewLog(dir string, c Config) (*Log, error) {
 	return l, l.setup()
 }
 
+// When a log starts, set itself up for for segments already
+// exist on disk or if the leg is new and has no segments
+// then bootstraping the initial segment.
 func (l *Log) setup() error {
 	files, err := ioutil.ReadDir(l.Dir)
 	if err != nil {
 		return err
 	}
 
+	// Fetch the list of segments on disk, parse and sort the
+	// base offsets in order from oldest to newest.
 	var baseOffsets []uint64
 	for _, file := range files {
 		offStr := strings.TrimSuffix(file.Name(), path.Ext(file.Name()))
@@ -71,4 +79,52 @@ func (l *Log) setup() error {
 	}
 
 	return nil
+}
+
+// Appends a record to the log. Append the record to the
+// active segment. Make a new active segment if the segment
+// is at its max size (per the max size configuration).
+func (l *Log) Append(record *api.Record) (uint64, error) {
+	// RWMutex is used to grant access to reads when there
+	// isn't a write holding the lock.
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	offset, err := l.activeSegment.Append(record)
+	if err != nil {
+		return 0, err
+	}
+
+	if l.activeSegment.IsMaxed() {
+		err = l.newSegment(offset + 1)
+	}
+
+	return offset, err
+}
+
+// Reads the record stored at the given offset.
+func (l *Log) Read(offset uint64) (*api.Record, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	var s *segment
+	for _, segment := range l.segments {
+		// Since the segments are in order from oldest to newest and the
+		// segment's base offset is the smallest offset in the segment,
+		// we iterate over the segments until we find the first segment
+		// whose base offset is less than or equal to the offset we seek.
+		if segment.baseOffset <= offset && offset < segment.nextOffset {
+			s = segment
+			break
+		}
+	}
+
+	if s == nil || s.nextOffset <= offset {
+		return nil, fmt.Errorf("offset out of range: %d", offset)
+	}
+
+	// Once we know the segment that contains the record, we get the index
+	// entry from the segment's index and we read the data out of the
+	// segment's store file and return the data.
+	return s.Read(offset)
 }
