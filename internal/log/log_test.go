@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	api "github.com/jimxshaw/loglib/api/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,4 +31,17 @@ func TestLog(t *testing.T) {
 			fn(t, log)
 		})
 	}
+}
+
+func testAppendRead(t *testing.T, log *Log) {
+	append := &api.Record{
+		Value: []byte("hello world"),
+	}
+	offset, err := log.Append(append)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), offset)
+
+	read, err := log.Read(offset)
+	require.NoError(t, err)
+	require.Equal(t, append.Value, read.Value)
 }
