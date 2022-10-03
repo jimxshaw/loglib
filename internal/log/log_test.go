@@ -7,6 +7,7 @@ import (
 
 	api "github.com/jimxshaw/loglib/api/v1"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestLog(t *testing.T) {
@@ -81,4 +82,22 @@ func testInitExisting(t *testing.T, o *Log) {
 	offset, err = n.HighestOffset()
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), offset)
+}
+
+func testReader(t *testing.T, log *Log) {
+	append := &api.Record{
+		Value: []byte("hello world"),
+	}
+	offset, err := log.Append(append)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), offset)
+
+	reader := log.Reader()
+	b, err := ioutil.ReadAll(reader)
+	require.NoError(t, err)
+
+	read := &api.Record{}
+	err = proto.Unmarshal(b[lenWidth:], read)
+	require.NoError(t, err)
+	require.Equal(t, append.Value, read.Value)
 }
